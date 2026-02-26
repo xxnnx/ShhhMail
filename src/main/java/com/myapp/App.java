@@ -7,6 +7,7 @@ public class App{
        Scanner scanner = new Scanner(System.in);
        MailTerminal.clearScreen();
        loading("Подключение к серверам Mail.ru", 2);
+       MailTerminal.clearScreen();
        MailTerminal.main(new String[0]);
     }
 

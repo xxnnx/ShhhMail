@@ -7,6 +7,7 @@ import jakarta.mail.internet.MimeMultipart;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Properties;
@@ -58,25 +59,46 @@ public class MailTerminal{
             clearScreen();
 
             System.out.println("Добро пожаловать!\n");
+            System.out.println("[1] Открыть письма (только зашифрованные)");
+            System.out.println("[2] Открыть письма (все)");
             
+            Scanner scanner_main = new Scanner(System.in);
+            int choice_main = scanner_main.nextInt();
+            List<Message> filteredMessages = new ArrayList<>();
+            int limit = Math.max(0, messages.length - 50); 
+
+            if (choice_main == 1){
+                for (int i = messages.length - 1; i >= limit && filteredMessages.size() < 5; i--){
+                    System.out.print(".");
+                    if (messages[i].getSubject() != null && messages[i].getSubject().contains("[ENCRYPTED]"))
+                        filteredMessages.add(messages[i]);
+                }
+            } else { for (int i = messages.length - 1; i >= 0 && filteredMessages.size() < 5; i--){ filteredMessages.add(messages[i]); }}
+            
+            clearScreen();
+
             int total = messages.length;
             int countToShow = 5;
 
-            System.out.println("--- ПОСЛЕДНИЕ ПИСЬМА ---");
-            //for (int i = 0; i < countToShow; i++) {
-                int i = 0;
-                int index = total - 1 - i;
-                String subject = messages[index].getSubject();
-                //System.out.println("[" + (i + 1) + "] " + messages[index].getSubject());
-
-            if (subject != null && subject.contains("[ENCRYPTED]")) {
-                System.out.println("\033[31m[" + (i + 1) + "] [!] " + subject + "\033[0m");
+            System.out.println("\n--- ПОСЛЕДНИЕ ПИСЬМА ---");
+            if (filteredMessages.isEmpty()) {
+                System.out.println("[!] Зашифрованных писем в последних сообщениях не найдено.");
             } else {
-            }
-            //}
+                for (int i = 0; i < filteredMessages.size(); i++) {
+                    String sub = filteredMessages.get(i).getSubject();
+                    if (sub != null && sub.contains("[ENCRYPTED]")) {
+                        System.out.println("\033[31m[" + (i + 1) + "] [!] " + sub + "\033[0m");
+                    } else {
+                        System.out.println("[" + (i + 1) + "] " + sub);
+                    }
+                }
+
+            System.out.print("\n[ ]: "); 
+            
+            int choice = scanner_main.nextInt();
+            scanner_main.nextLine();
 
             Scanner scanner = new Scanner(System.in);
-            int choice = scanner.nextInt();
 
             if (choice > 0 && choice <= countToShow){
                 Message selected = messages[total - choice];
@@ -148,7 +170,8 @@ public class MailTerminal{
 
             inbox.close(false);
             store.close();
-        } catch (Exception e1) {
+        }
+    } catch (Exception e1) {
             e1.printStackTrace();
         }
     }
@@ -164,6 +187,7 @@ public class MailTerminal{
         }
         return "[Письмо содержит HTML или вложения, просмотр простого текста недоступен]";
     }
+
     public static void clearScreen() {
         System.out.print("\033[H\033[2J");
         System.out.flush();
