@@ -46,6 +46,9 @@ public class MailTerminal{
         props.put("mail.imaps.port", "993");
         props.put("mail.imaps.ssl.enable", "true");
 
+        List<Message> filteredMessages = new ArrayList<>();
+        Scanner scanner_main = new Scanner(System.in);
+
         try {
             Session session = Session.getInstance(props);
             Store store = session.getStore("imaps");
@@ -56,125 +59,131 @@ public class MailTerminal{
 
             Message[] messages = inbox.getMessages();
 
+
+            while (true) {
             clearScreen();
-
-            System.out.println("Добро пожаловать!\n");
-            System.out.println("[1] Открыть письма (только зашифрованные)");
-            System.out.println("[2] Открыть письма (все)");
-            
-            Scanner scanner_main = new Scanner(System.in);
-            int choice_main = scanner_main.nextInt();
-            List<Message> filteredMessages = new ArrayList<>();
-            int limit = Math.max(0, messages.length - 50); 
-
-            if (choice_main == 1){
-                for (int i = messages.length - 1; i >= limit && filteredMessages.size() < 5; i--){
-                    System.out.print(".");
-                    if (messages[i].getSubject() != null && messages[i].getSubject().contains("[ENCRYPTED]"))
-                        filteredMessages.add(messages[i]);
-                }
-            } else { for (int i = messages.length - 1; i >= 0 && filteredMessages.size() < 5; i--){ filteredMessages.add(messages[i]); }}
-            
-            clearScreen();
-
-            int total = messages.length;
-            int countToShow = 5;
-
-            System.out.println("\n--- ПОСЛЕДНИЕ ПИСЬМА ---");
-            if (filteredMessages.isEmpty()) {
-                System.out.println("[!] Зашифрованных писем в последних сообщениях не найдено.");
-            } else {
-                for (int i = 0; i < filteredMessages.size(); i++) {
-                    String sub = filteredMessages.get(i).getSubject();
-                    if (sub != null && sub.contains("[ENCRYPTED]")) {
-                        System.out.println("\033[31m[" + (i + 1) + "] [!] " + sub + "\033[0m");
-                    } else {
-                        System.out.println("[" + (i + 1) + "] " + sub);
-                    }
-                }
-
-            System.out.print("\n[ ]: "); 
-            
-            int choice = scanner_main.nextInt();
-            scanner_main.nextLine();
-
-            Scanner scanner = new Scanner(System.in);
-
-            if (choice > 0 && choice <= countToShow){
-                Message selected = messages[total - choice];
-                String rawText = getTextFromMessage(selected);
-
-                System.out.println("\n==================================");
-                System.out.println("ОТ: " + selected.getFrom()[0]);
-                System.out.println("ТЕМА: " + selected.getSubject());
-                System.out.println("ТЕКСТ ПИСЬМА:");
-                System.out.println("----------------------------------");
-                System.out.println(getTextFromMessage(selected));
-                System.out.println("==================================");
-
-                System.out.println("1) Расшифровать текст");
-                System.out.println("2) Ответить");
-
-                int subchoice = scanner.nextInt();
-                scanner.nextLine();
-
-                if (subchoice == 1){
-                    byte[] encryptedBytes = null; 
-                    try {
-                            encryptedBytes = Base64.getDecoder().decode(rawText.trim());
-
-                            SecretKeySpec secretkey = new SecretKeySpec(CRYPTO_KEY.getBytes(), "AES");
-                            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                            cipher.init(Cipher.DECRYPT_MODE, secretkey);
-
-                            byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
-
-                            System.out.println("\n--- РАСШИФРОВАННЫЙ ТЕКСТ ---");
-                            System.out.println(new String(decryptedBytes, "UTF-8"));
-                            System.out.println("---------------------------");
-                        
-                    } catch (IllegalArgumentException e1){ 
-                        System.out.println("\n[!] Не удалось расшифровать ключом из конфига.");
-                        System.out.println("Возможно, отправитель использовал другой ключ.");
-                        System.out.println("Хотите ввести другой ключ? (y/n)]");
-                        String answer = scanner.nextLine();
-                        if (answer.equalsIgnoreCase("y")){
-                            System.out.println("16-значный ключ:");
-                            String otherkey = scanner.nextLine();
-                            if (otherkey.length() == 16){
-                                try {
-                                    SecretKeySpec manualSkey = new SecretKeySpec(otherkey.getBytes("UTF-8"), "AES");
-                                    Cipher manualCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                                    manualCipher.init(Cipher.DECRYPT_MODE, manualSkey);
-                                    byte[] manualDecrypted = manualCipher.doFinal(encryptedBytes);
-
-                                    System.out.println("\n--- РАСШИФРОВАННО ВРУЧНУЮ ---");
-                                    System.out.println(new String(manualDecrypted, "UTF-8"));
-                                    System.out.println("-----------------------------");
-                                } catch (Exception ex) {
-                                    System.out.println("[!] Ошибка: Ручной ключ тоже не подошел. Текст остается секретом.");
-                                }
-                            }
-
-                        } else { System.out.println("[!] Ошибка: Нужно ровно 16 символов!"); } 
-                    }
-                } else if (subchoice == 2){
-                    System.out.print("Введите текст ответа: ");
-                    String replyText = scanner.nextLine();
-
-                    String recipient = selected.getFrom()[0].toString();
-                    sendReply(recipient, selected.getSubject(), replyText, session, user, password, CRYPTO_KEY);
-                    System.out.println("[...] Шифруем ключом из конфига и отправляем...");
-                }
+            String red = "\u001B[31m";
+            String reset = "\u001B[0m";
+            String[] hello3D = {
+            "     _    _  ______ _      _       ____  ",
+            "    | |  | ||  ____| |    | |     / __ \\ ",
+            "    | |__| || |__  | |    | |    | |  | |",
+            "    |  __  ||  __| | |    | |    | |  | |",
+            "    | |  | || |____| |____| |____| |__| |",
+            "    |_|  |_||______|______|______|\\____/ "
+            };
+            for (String line : hello3D) {
+                System.out.println(red + line + reset);
             }
+            System.out.println("    "+ user + "\n");
+            System.out.println("\n[1] Открыть письма (только зашифрованные)");
+            System.out.println("[2] Открыть письма (все)");
+            System.out.println("[3] Отправить письмо");
+            System.out.print("\n[ ]: "); 
+            int choice_main = scanner_main.nextInt();
 
+            if (choice_main == 0) { break;}
+            filteredMessages.clear();
+
+            if (choice_main == 1 || choice_main == 2) {
+                    int limit = Math.max(0, messages.length - 50);
+                    
+                    for (int i = messages.length - 1; i >= limit && filteredMessages.size() < 5; i--) {
+                        if (choice_main == 1) {
+                            if (messages[i].getSubject() != null && messages[i].getSubject().contains("[ENCRYPTED]")) {
+                                filteredMessages.add(messages[i]);
+                            }
+                        } else {
+                            filteredMessages.add(messages[i]);
+                        }
+                    }
+                    System.out.println("\n--- ПОСЛЕДНИЕ ПИСЬМА ---");
+                    if (filteredMessages.isEmpty()) {
+                        System.out.println("[!]      Писем не найдено.");
+                    } else {
+                        for (int i = 0; i < filteredMessages.size(); i++) {
+                            String sub = filteredMessages.get(i).getSubject();
+                            if (sub != null && sub.contains("[ENCRYPTED]")) {
+                                System.out.println("\033[31m[" + (i + 1) + "] [!] " + sub + "\033[0m");
+                            } else {
+                                System.out.println("[" + (i + 1) + "] " + sub);
+                            }
+                        }
+                        System.out.print("\nВыберите номер письма для чтения (или 0 для возврата): ");
+                        int mailChoice = scanner_main.nextInt();
+                        scanner_main.nextLine();
+                        
+                        if (mailChoice > 0 && mailChoice <= filteredMessages.size()) {
+                            Message selected = filteredMessages.get(mailChoice - 1);
+                            String rawText = getTextFromMessage(selected); // Ваш метод получения текста
+
+                            System.out.println("\n==================================");
+                            System.out.println("ОТ: " + selected.getFrom()[0]);
+                            System.out.println("ТЕМА: " + selected.getSubject());
+                            System.out.println("СОДЕРЖИМОЕ:\n" + rawText);
+                            System.out.println("==================================");
+
+                            System.out.println("1) Расшифровать");
+                            System.out.println("2) Ответить");
+                            System.out.println("0) Назад");
+
+                            int subchoice = scanner_main.nextInt();
+                            scanner_main.nextLine();
+
+                            if (subchoice == 1) {
+                                decryptAndPrint(rawText, CRYPTO_KEY, scanner_main);
+                            } else if (subchoice == 2) {
+                                System.out.print("Введите текст ответа: ");
+                                String replyText = scanner_main.nextLine();
+                                sendReply(selected.getFrom()[0].toString(), selected.getSubject(), replyText, session, user, password, CRYPTO_KEY);
+                            }
+                        }
+                    }
+                }
+            else if (choice_main == 3) {
+                    scanner_main.nextLine();
+                    System.out.print("Введите Email получателя: ");
+                    String recipient = scanner_main.nextLine();
+
+                    System.out.print("Введите тему письма: ");
+                    String subject = scanner_main.nextLine();
+
+                    System.out.print("Введите сообщение:");
+                    String messagetext = scanner_main.nextLine();
+
+                    sendReply(recipient, subject, messagetext, session, user, password, CRYPTO_KEY);
+                    System.out.println("\nНажмите Enter для возврата в меню...");
+                    scanner_main.nextLine();
+            }
+            clearScreen();
+            }    
             inbox.close(false);
             store.close();
-        }
     } catch (Exception e1) {
             e1.printStackTrace();
         }
     }
+
+    private static void decryptAndPrint(String rawText, String key, Scanner scanner) {
+    try {
+        byte[] encryptedBytes = Base64.getDecoder().decode(rawText.trim());
+        SecretKeySpec skey = new SecretKeySpec(key.getBytes("UTF-8"), "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, skey);
+        
+        byte[] decrypted = cipher.doFinal(encryptedBytes);
+        System.out.println("\n[!] РАСШИФРОВАНО:\n" + new String(decrypted, "UTF-8"));
+    } catch (Exception e) {
+        System.out.println("\n[!] Ошибка: Ключ не подошел. Ввести вручную? (y/n)");
+        if (scanner.nextLine().equalsIgnoreCase("y")) {
+            System.out.print("Введите 16-значный ключ: ");
+            String altKey = scanner.nextLine();
+        }
+    }
+    System.out.println("\nНажмите Enter...");
+    scanner.nextLine();
+}
+
     private static String getTextFromMessage(Message message) throws Exception {
         if (message.isMimeType("text/plain")) {
             return message.getContent().toString();
@@ -204,25 +213,36 @@ public class MailTerminal{
             Message reply = new MimeMessage(session);
             reply.setFrom(new InternetAddress(user));
             reply.setRecipient(Message.RecipientType.TO, new InternetAddress(to));
-            reply.setSubject("Re: [ENCRYPTED]" + subject);
+            reply.setSubject("[ENCRYPTED]" + subject);
             reply.setText(secureBody);
 
             Properties smtpProps = new Properties();
             smtpProps.put("mail.smtp.host", "smtp.mail.ru");
-            smtpProps.put("mail.smtp.port", "465");
-            smtpProps.put("mail.smtp.ssl.enable", "true");
+            smtpProps.put("mail.smtp.port", "587");
+            smtpProps.put("mail.smtp.ssl.enable", "false");
+            smtpProps.put("mail.smtp.starttls.enable", "true");
             smtpProps.put("mail.smtp.auth", "true");
 
+            smtpProps.put("mail.smtp.connectiontimeout", "5000"); 
+            smtpProps.put("mail.smtp.timeout", "5000");
+
             Session smtpSession = Session.getInstance(smtpProps, new Authenticator() {
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(user, password);
-        }
-    });
-        Transport transport = smtpSession.getTransport("smtp");
-        transport.connect("smtp.mail.ru", user, password);
-        transport.sendMessage(reply, reply.getAllRecipients());
-        transport.close();
-        System.out.println("\n[OK] Ответ отправлен!");
+                @Override
+                protected PasswordAuthentication getPasswordAuthentication() {
+                    return new PasswordAuthentication(user, password);}
+            });
+            Message message = new MimeMessage(smtpSession);
+            message.setFrom(new InternetAddress(user));
+            message.setRecipient(Message.RecipientType.TO, new InternetAddress(to));
+
+            String finalSubject = subject.contains("[ENCRYPTED]") ? subject : "[ENCRYPTED] " + subject;
+            message.setSubject(finalSubject);
+            message.setText(secureBody);
+
+            System.out.println("[...] Установка соединения с SMTP...");
+            Transport.send(message);
+        
+            System.out.println("\n[OK] Сообщение успешно отправлено!");
     } catch (Exception e) {
         System.out.println("\n[!] Ошибка при отправке: " + e.getMessage());
     }}
