@@ -1,5 +1,5 @@
 #email
-slavik.kovalenko2005@mail.ru
+email
 #password
 password
 #crypto_password (u're key)
